@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Interactive Status/Story Creator</title>
-    <!-- Load FFmpeg.wasm from a CDN -->
-    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+    <!-- NEW, LIGHTWEIGHT VIDEO ENGINE -->
+    <script src="https://unpkg.com/canvas-capture@1.0.8/dist/canvas-capture.umd.js"></script>
     <style>
         :root {
             --primary-color: #5E35B1; /* Deep Purple */
@@ -136,7 +136,7 @@
             <h3>Creating Your Video...</h3>
             <p>This may take a moment. Please keep this window open.</p>
             <div id="progress-bar"><div id="progress-bar-inner"></div></div>
-            <p id="progress-text">Initializing Video Engine...</p>
+            <p id="progress-text">Initializing...</p>
         </div>
         
         <!-- Ad Unit 2 Start -->
@@ -152,9 +152,7 @@
     </div>
 
     <script>
-        const { createFFmpeg, fetchFile } = FFmpeg;
-        let ffmpeg;
-
+        // --- DOM Elements ---
         const imageUpload = document.getElementById('image-upload');
         const uploadStep = document.getElementById('upload-step');
         const configStep = document.getElementById('config-step');
@@ -166,9 +164,8 @@
         const progressText = document.getElementById('progress-text');
         
         let pageData = [];
-        const DURATION = 3;
         
-        const embeddedMusicB64 = "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AAACAAAAGIbWduaQAAACAAAAGob3JpZwAAAAgAAAG4ZGF0YQAAAAgAAAG8dG9vbAAAABIAAAG+d2F2ZQAAABIAAAG+cGlkcwAAAAYAAAHGAAAAAJAAAaQAAAADAAADwJ7//gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/7gAMA1w/SAAAAAAFTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV-2D";
+        const embeddedMusicB64 = "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AAACAAAAGIbWduaQAAACAAAAGob3JpZwAAAAgAAAG4ZGF0YQAAAAgAAAG8dG9vbAAAABIAAAG+d2F2ZQAAABIAAAG+cGlkcwAAAAYAAAHGAAAAAJAAAaQAAAADAAADwJ7//gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/7gAMA1w/SAAAAAAFTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV-2D";
 
         const catalogs = {
             "kenburns": { name: "Gentle Pan & Zoom" },
@@ -229,7 +226,7 @@
 
         async function handleShare() {
             configStep.style.display = 'none';
-            shareButton.style.display = 'none';
+            shareButton.disabled = true; // Disable button during processing
             progressStep.style.display = 'block';
             
             try {
@@ -255,6 +252,8 @@
                 progressStep.style.display = 'none';
                 uploadStep.style.display = 'block';
                 imageUpload.value = '';
+                shareButton.style.display = 'none';
+                shareButton.disabled = false;
             }
         }
 
@@ -272,92 +271,118 @@
              }, 1500);
         }
         
-        async function initFFmpeg() {
-            if (!ffmpeg) {
-                ffmpeg = createFFmpeg({ log: true });
-                ffmpeg.setProgress(({ ratio }) => {
-                    progressBarInner.style.width = `${Math.min(1, ratio) * 100}%`;
-                });
-            }
-            if (!ffmpeg.isLoaded()) {
-                await ffmpeg.load();
-            }
-        }
-
-        function sanitizeTextForFFmpeg(text) {
-            return text.replace(/'/g, "’").replace(/:/g, "\\:").replace(/%/g, "\\%");
-        }
-
         async function generateVideo() {
-            progressText.textContent = 'Loading Video Engine...';
-            await initFFmpeg();
+            const DURATION_PER_IMAGE = 3;
+            const FRAME_RATE = 30;
+            const totalFrames = FRAME_RATE * DURATION_PER_IMAGE * pageData.length;
 
-            try {
-                const files = ffmpeg.FS('readdir', '/');
-                for (const file of files) {
-                    if (file !== '.' && file !== '..') {
-                        ffmpeg.FS('unlink', file);
-                    }
-                }
-            } catch (e) {}
-
-            progressText.textContent = 'Preparing your assets...';
+            progressText.textContent = 'Initializing Renderer...';
+            progressBarInner.style.width = '0%';
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 720;
+            canvas.height = 1280;
+            const ctx = canvas.getContext('2d');
+            
+            const imagePromises = pageData.map(p => new Promise(resolve => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.src = p.src;
+            }));
+            const loadedImages = await Promise.all(imagePromises);
+            
             const musicBlob = await (await fetch(`data:audio/mpeg;base64,${embeddedMusicB64}`)).blob();
-            ffmpeg.FS('writeFile', 'music.mp3', new Uint8Array(await musicBlob.arrayBuffer()));
+            const musicBuffer = await musicBlob.arrayBuffer();
 
-            for (let i = 0; i < pageData.length; i++) {
-                ffmpeg.FS('writeFile', `img${i}.jpg`, await fetchFile(pageData[i].src));
-            }
-            
-            const selectedCatalogKey = catalogSelect.value;
-            const videoWidth = 720;
-            const videoHeight = 1280;
-            let filterComplex = '';
-            
-            for (let i = 0; i < pageData.length; i++) {
-                const text = sanitizeTextForFFmpeg(pageData[i].text);
-                filterComplex += `[${i}:v]scale=${videoWidth}:${videoHeight}:force_original_aspect_ratio=increase,crop=${videoWidth}:${videoHeight},setsar=1,format=yuv420p`;
-                if (text) {
-                     filterComplex += `,drawtext=text='${text}':fontcolor=white:fontsize=60:box=1:boxcolor=black@0.5:boxborderw=10:x=(w-text_w)/2:y=h-text_h-100`;
+            const stream = await CanvasCapture.capture(canvas, {
+                frameRate: FRAME_RATE,
+                quality: 0.9,
+                audio: musicBuffer,
+                onExportProgress: (p) => {
+                     progressText.textContent = `Encoding Video... ${Math.round(p * 100)}%`;
+                     progressBarInner.style.width = `${p * 100}%`;
                 }
-                filterComplex += `[v${i}];`;
-            }
+            });
 
-            let lastOutput = 'v0';
-            for (let i = 0; i < pageData.length - 1; i++) {
-                const currentOutput = `out${i}`;
-                const transitionFilter = getTransitionFilter(selectedCatalogKey, DURATION);
-                filterComplex += `[${lastOutput}][v${i+1}]${transitionFilter}[${currentOutput}];`;
-                lastOutput = currentOutput;
+            stream.begin();
+            for (let i = 0; i < totalFrames; i++) {
+                const imageIndex = Math.floor(i / (FRAME_RATE * DURATION_PER_IMAGE));
+                const frameInImage = i % (FRAME_RATE * DURATION_PER_IMAGE);
+                const progress = frameInImage / (FRAME_RATE * DURATION_PER_IMAGE);
+                
+                drawFrame(ctx, loadedImages[imageIndex], pageData[imageIndex].text, progress, catalogSelect.value);
+                await stream.capture();
+                
+                const renderProgress = (i / totalFrames) * 100;
+                progressBarInner.style.width = `${renderProgress}%`;
+                progressText.textContent = `Rendering Frames (${Math.round(renderProgress)}%)...`;
             }
-
-            progressText.textContent = 'Encoding your video...';
-            const command = [
-                ...pageData.map((_, i) => ['-loop', '1', '-t', String(DURATION), '-i', `img${i}.jpg`]).flat(),
-                '-i', 'music.mp3',
-                '-filter_complex', filterComplex,
-                '-map', `[${lastOutput}]`, '-map', `${pageData.length}:a`,
-                '-c:v', 'libx264', '-c:a', 'aac', '-shortest', '-pix_fmt', 'yuv420p',
-                'output.mp4'
-            ];
-            
-            await ffmpeg.run(...command);
-            
-            progressText.textContent = 'Finalizing...';
-            const data = ffmpeg.FS('readFile', 'output.mp4');
-            return new Blob([data.buffer], { type: 'video/mp4' });
+            const videoBlob = await stream.end();
+            return videoBlob;
         }
 
-        function getTransitionFilter(catalog, duration) {
-            const transitionDuration = 0.7;
-            switch(catalog) {
-                case 'slide': return `xfade=transition=slideright:duration=${transitionDuration}:offset=${duration - transitionDuration}`;
-                case 'party': return `xfade=transition=circleopen:duration=${transitionDuration}:offset=${duration - transitionDuration}`;
-                case 'scrapbook': return `xfade=transition=wipeleft:duration=${transitionDuration}:offset=${duration - transitionDuration}`;
-                default: return `xfade=transition=fade:duration=${transitionDuration}:offset=${duration - transitionDuration}`;
+        function drawFrame(ctx, img, text, progress, catalog) {
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            
+            const canvasAspect = ctx.canvas.width / ctx.canvas.height;
+            const imgAspect = img.width / img.height;
+            let drawWidth, drawHeight, offsetX, offsetY;
+            
+            if (canvasAspect > imgAspect) {
+                drawHeight = ctx.canvas.height;
+                drawWidth = drawHeight * imgAspect;
+                offsetX = (ctx.canvas.width - drawWidth) / 2;
+                offsetY = 0;
+            } else {
+                drawWidth = ctx.canvas.width;
+                drawHeight = drawWidth / imgAspect;
+                offsetX = 0;
+                offsetY = (ctx.canvas.height - drawHeight) / 2;
+            }
+
+            if (catalog === 'kenburns') {
+                const scale = 1 + progress * 0.1;
+                ctx.drawImage(img, offsetX - (drawWidth * (scale - 1)) / 2, offsetY - (drawHeight * (scale - 1)) / 2, drawWidth * scale, drawHeight * scale);
+            } else if (catalog === 'slide') {
+                const slideIn = Math.min(1, progress * 4);
+                ctx.drawImage(img, offsetX - (1 - slideIn) * ctx.canvas.width, offsetY, drawWidth, drawHeight);
+            } else if (catalog === 'fade') {
+                ctx.globalAlpha = Math.min(1, progress * 3);
+                ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+                ctx.globalAlpha = 1;
+            } else if (catalog === 'party') {
+                const scale = 1.2 - Math.abs(progress - 0.5) * 0.4;
+                ctx.drawImage(img, offsetX - (drawWidth * (scale - 1)) / 2, offsetY - (drawHeight * (scale - 1)) / 2, drawWidth * scale, drawHeight * scale);
+            } else if (catalog === 'vintage') {
+                ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+                ctx.globalAlpha = 0.1;
+                ctx.fillStyle = '#D2B48C';
+                ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                ctx.globalAlpha = 1;
+            } else if (catalog === 'scrapbook') {
+                const angle = (1 - Math.min(1, progress * 3)) * -0.2;
+                ctx.save();
+                ctx.translate(ctx.canvas.width / 2, ctx.canvas.height / 2);
+                ctx.rotate(angle);
+                ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+                ctx.restore();
+            } else {
+                 ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+            }
+
+            if (text) {
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 60px Arial';
+                ctx.fillStyle = 'white';
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = 4;
+                ctx.strokeText(text, ctx.canvas.width / 2, ctx.canvas.height - 100);
+                ctx.fillText(text, ctx.canvas.width / 2, ctx.canvas.height - 100);
             }
         }
-        
+
         function readFileAsDataURL(file) {
             return new Promise(resolve => {
                 const reader = new FileReader();
