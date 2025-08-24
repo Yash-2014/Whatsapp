@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Status/Story Creator</title>
+    <!-- Load FFmpeg.wasm from a CDN -->
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #5E35B1; /* Deep Purple */
+            --primary-variant-color: #4527A0;
+            --secondary-color: #00897B; /* Teal */
+            --background-color: #F5F5F5;
+            --surface-color: #FFFFFF;
+            --on-primary-color: #FFFFFF;
+            --on-surface-color: #212121;
+            --app-bar-height: 56px;
+            --fab-height: 72px;
+        }
+        html { height: 100%; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            background-color: var(--background-color);
+            color: var(--on-surface-color);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+        .app-bar {
+            background-color: var(--primary-color);
+            color: var(--on-primary-color);
+            height: var(--app-bar-height);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            font-size: 1.25em;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+        .main-content {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 16px 16px var(--fab-height) 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .fab-container {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: linear-gradient(to top, rgba(245,245,245,1) 80%, rgba(245,245,245,0));
+            padding: 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+        #share-button {
+            background-color: var(--secondary-color);
+            color: var(--on-primary-color);
+            border: none;
+            padding: 16px 32px;
+            border-radius: 28px;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: 500;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+        #share-button:disabled { background-color: #BDBDBD; box-shadow: none; cursor: not-allowed; }
+
+        .card {
+            background-color: var(--surface-color);
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+            width: 100%;
+            max-width: 700px;
+            box-sizing: border-box;
+            margin-bottom: 16px;
+        }
+        .card h3 { margin-top: 0; border-bottom: 1px solid #E0E0E0; padding-bottom: 8px; font-weight: 500; }
+        .card input, .card select {
+            width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #BDBDBD; box-sizing: border-box; background-color: #FAFAFA;
+        }
+        .upload-card { text-align: center; }
+        #image-upload { display: none; }
+        .upload-label {
+            background-color: var(--primary-color); color: var(--on-primary-color); padding: 12px 24px; border-radius: 24px;
+            cursor: pointer; display: inline-block; font-weight: 500; transition: background-color 0.3s;
+        }
+        .image-preview-container { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+        .image-preview-item { width: 100px; }
+        .image-preview-item img { width: 100px; height: 100px; object-fit: cover; border-radius: 8px; }
+        .image-preview-item input { margin-top: 5px; padding: 5px; font-size: 0.9em; }
+
+        #progress-step { text-align: center; }
+        #progress-bar { width: 100%; height: 20px; background-color: #e0e0e0; border-radius: 10px; overflow: hidden; margin-top: 10px; }
+        #progress-bar-inner { width: 0%; height: 100%; background-color: var(--secondary-color); transition: width 0.3s; }
+        #progress-text { margin-top: 10px; font-weight: 500; color: var(--primary-color); }
+    </style>
+</head>
+<body>
+    <div class="app-bar">WhatsApp Status/Story Creator</div>
+
+    <div class="main-content">
+        <!-- Ad Unit 1 Start -->
+        <div style="text-align: center; margin-bottom: 16px; max-width: 700px; width: 100%;">
+            <script type="text/javascript">
+                atOptions = { 'key' : '5151d99dda1d9483bde7073716b4e6c7', 'format' : 'iframe', 'height' : 60, 'width' : 468, 'params' : {} };
+            </script>
+            <script type="text/javascript" src="//www.highperformanceformat.com/5151d99dda1d9483bde7073716b4e6c7/invoke.js"></script>
+        </div>
+        <!-- Ad Unit 1 End -->
+
+        <div id="upload-step" class="card upload-card">
+            <h3>Step 1: Upload 3 to 5 Photos</h3>
+            <label for="image-upload" class="upload-label">Select Photos</label>
+            <input type="file" id="image-upload" accept="image/*" multiple>
+        </div>
+
+        <div id="config-step" class="card" style="display: none;">
+             <h3>Step 2: Customize Your Story</h3>
+             <label for="catalog-select">Select a Catalog Style</label>
+             <select id="catalog-select"></select>
+             <hr style="border: none; border-top: 1px solid #eee; margin: 16px 0;">
+             <h3>Add Text to Photos</h3>
+             <div id="image-preview-container"></div>
+        </div>
+
+        <div id="progress-step" class="card" style="display: none;">
+            <h3>Creating Your Video...</h3>
+            <p>This may take a moment. Please keep this window open.</p>
+            <div id="progress-bar"><div id="progress-bar-inner"></div></div>
+            <p id="progress-text">Initializing Video Engine...</p>
+        </div>
+        
+        <!-- Ad Unit 2 Start -->
+        <div style="text-align: center; margin-top: 20px; max-width: 700px; width: 100%;">
+            <script async="async" data-cfasync="false" src="//pl26619138.profitableratecpm.com/747fe3a777ea36bae9c74e6d87a82e60/invoke.js"></script>
+            <div id="container-747fe3a777ea36bae9c74e6d87a82e60"></div>
+        </div>
+        <!-- Ad Unit 2 End -->
+    </div>
+
+    <div class="fab-container">
+        <button id="share-button" style="display: none;">Create & Share Video</button>
+    </div>
+
+    <script>
+        const { createFFmpeg, fetchFile } = FFmpeg;
+        let ffmpeg;
+
+        const imageUpload = document.getElementById('image-upload');
+        const uploadStep = document.getElementById('upload-step');
+        const configStep = document.getElementById('config-step');
+        const progressStep = document.getElementById('progress-step');
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+        const shareButton = document.getElementById('share-button');
+        const catalogSelect = document.getElementById('catalog-select');
+        const progressBarInner = document.getElementById('progress-bar-inner');
+        const progressText = document.getElementById('progress-text');
+        
+        let pageData = [];
+        const DURATION = 3;
+        
+        const embeddedMusicB64 = "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AAACAAAAGIbWduaQAAACAAAAGob3JpZwAAAAgAAAG4ZGF0YQAAAAgAAAG8dG9vbAAAABIAAAG+d2F2ZQAAABIAAAG+cGlkcwAAAAYAAAHGAAAAAJAAAaQAAAADAAADwJ7//gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/7gAMA1w/SAAAAAAFTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV-2D";
+
+        const catalogs = {
+            "kenburns": { name: "Gentle Pan & Zoom" },
+            "slide": { name: "Clean Slide In" },
+            "fade": { name: "Smooth Fade" },
+            "party": { name: "Party Pop" },
+            "vintage": { name: "Vintage Film" },
+            "scrapbook": { name: "Scrapbook Turn" }
+        };
+
+        function populateCatalogSelect() {
+            for (const key in catalogs) {
+                catalogSelect.add(new Option(catalogs[key].name, key));
+            }
+        }
+        populateCatalogSelect();
+
+        imageUpload.addEventListener('change', handleImageUpload);
+        shareButton.addEventListener('click', handleShare);
+        
+        async function handleImageUpload(event) {
+            let files = Array.from(event.target.files);
+            if (files.length === 0) return;
+            if (files.length > 5) {
+                alert("Please select a maximum of 5 photos for the best result.");
+                files = files.slice(0, 5);
+            } else if (files.length < 3) {
+                alert("Please select at least 3 photos.");
+                return;
+            }
+
+            const promises = files.map(readFileAsDataURL);
+            const dataUrls = await Promise.all(promises);
+
+            pageData = dataUrls.map(src => ({ src, text: '' }));
+
+            renderImagePreviews();
+            uploadStep.style.display = 'none';
+            configStep.style.display = 'block';
+            shareButton.style.display = 'block';
+        }
+
+        function renderImagePreviews() {
+            imagePreviewContainer.innerHTML = '';
+            pageData.forEach((page, index) => {
+                const item = document.createElement('div');
+                item.className = 'image-preview-item';
+                item.innerHTML = `
+                    <img src="${page.src}" alt="Preview ${index + 1}">
+                    <input type="text" placeholder="Add text...">
+                `;
+                imagePreviewContainer.appendChild(item);
+                item.querySelector('input').addEventListener('input', e => {
+                    pageData[index].text = e.target.value;
+                });
+            });
+        }
+
+        async function handleShare() {
+            configStep.style.display = 'none';
+            shareButton.style.display = 'none';
+            progressStep.style.display = 'block';
+            
+            try {
+                const videoBlob = await generateVideo();
+                const fileName = `My-Story-${Date.now()}.mp4`;
+                const appUrl = 'YOUR_APPLICATION_URL_HERE';
+                const shareText = `Check out this video I made! 🎞️\n\nWant to make your own? Use the creator here: ${appUrl}`;
+                const shareFile = new File([videoBlob], fileName, { type: videoBlob.type });
+
+                if (navigator.canShare && navigator.canShare({ files: [shareFile] })) {
+                    await navigator.share({
+                        files: [shareFile],
+                        title: 'My Video Story',
+                        text: shareText,
+                    });
+                } else {
+                    fallbackShare(videoBlob, fileName, shareText);
+                }
+            } catch (error) {
+                console.error('Error generating video:', error);
+                alert('Oops! Something went wrong while creating the video. Please check the console for errors and try again.');
+            } finally {
+                progressStep.style.display = 'none';
+                uploadStep.style.display = 'block';
+                imageUpload.value = '';
+            }
+        }
+
+        function fallbackShare(blob, fileName, shareText) {
+             const url = URL.createObjectURL(blob);
+             const a = document.createElement('a');
+             a.href = url;
+             a.download = fileName;
+             document.body.appendChild(a);
+             a.click();
+             document.body.removeChild(a);
+             setTimeout(() => {
+                 window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`);
+                 URL.revokeObjectURL(url);
+             }, 1500);
+        }
+        
+        async function initFFmpeg() {
+            if (!ffmpeg) {
+                ffmpeg = createFFmpeg({ log: true });
+                ffmpeg.setProgress(({ ratio }) => {
+                    progressBarInner.style.width = `${Math.min(1, ratio) * 100}%`;
+                });
+            }
+            if (!ffmpeg.isLoaded()) {
+                await ffmpeg.load();
+            }
+        }
+
+        async function generateVideo() {
+            progressText.textContent = 'Loading Video Engine...';
+            await initFFmpeg();
+
+            // --- CRITICAL FIX: Clean up old files from previous runs ---
+            try {
+                for (const file of ffmpeg.FS('readdir', '/')) {
+                    if (file !== '.' && file !== '..') {
+                        ffmpeg.FS('unlink', file);
+                    }
+                }
+            } catch (e) {
+                console.log("No files to clean up, starting fresh.");
+            }
+            // --- End Fix ---
+
+            progressText.textContent = 'Preparing your assets...';
+            const musicBlob = await (await fetch(`data:audio/mpeg;base64,${embeddedMusicB64}`)).blob();
+            ffmpeg.FS('writeFile', 'music.mp3', new Uint8Array(await musicBlob.arrayBuffer()));
+
+            for (let i = 0; i < pageData.length; i++) {
+                ffmpeg.FS('writeFile', `img${i}.jpg`, await fetchFile(pageData[i].src));
+            }
+            
+            const selectedCatalogKey = catalogSelect.value;
+            const videoWidth = 720;
+            const videoHeight = 1280;
+            let filterComplex = '';
+            
+            for (let i = 0; i < pageData.length; i++) {
+                const text = pageData[i].text.replace(/'/g, "’").replace(/:/g, "\\:");
+                filterComplex += `[${i}:v]scale=${videoWidth}:${videoHeight}:force_original_aspect_ratio=increase,crop=${videoWidth}:${videoHeight},setsar=1,format=yuv420p`;
+                if (text) {
+                     filterComplex += `,drawtext=text='${text}':fontcolor=white:fontsize=60:box=1:boxcolor=black@0.5:boxborderw=10:x=(w-text_w)/2:y=h-text_h-100`;
+                }
+                filterComplex += `[v${i}];`;
+            }
+
+            let lastOutput = 'v0';
+            for (let i = 0; i < pageData.length - 1; i++) {
+                const currentOutput = `out${i}`;
+                const transitionFilter = getTransitionFilter(selectedCatalogKey, DURATION);
+                filterComplex += `[${lastOutput}][v${i+1}]${transitionFilter}[${currentOutput}];`;
+                lastOutput = currentOutput;
+            }
+
+            progressText.textContent = 'Encoding your video...';
+            const command = [
+                ...pageData.map((_, i) => ['-loop', '1', '-t', String(DURATION), '-i', `img${i}.jpg`]).flat(),
+                '-i', 'music.mp3',
+                '-filter_complex', filterComplex,
+                '-map', `[${lastOutput}]`, '-map', `${pageData.length}:a`,
+                '-c:v', 'libx264', '-c:a', 'aac', '-shortest', '-pix_fmt', 'yuv420p',
+                'output.mp4'
+            ];
+            
+            await ffmpeg.run(...command);
+            
+            progressText.textContent = 'Finalizing...';
+            const data = ffmpeg.FS('readFile', 'output.mp4');
+            return new Blob([data.buffer], { type: 'video/mp4' });
+        }
+
+        function getTransitionFilter(catalog, duration) {
+            const transitionDuration = 0.7;
+            switch(catalog) {
+                case 'slide': return `xfade=transition=slideright:duration=${transitionDuration}:offset=${duration - transitionDuration}`;
+                case 'party': return `xfade=transition=circleopen:duration=${transitionDuration}:offset=${duration - transitionDuration}`;
+                case 'scrapbook': return `xfade=transition=wipeleft:duration=${transitionDuration}:offset=${duration - transitionDuration}`;
+                default: return `xfade=transition=fade:duration=${transitionDuration}:offset=${duration - transitionDuration}`;
+            }
+        }
+        
+        function readFileAsDataURL(file) {
+            return new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.readAsDataURL(file);
+            });
+        }
+    </script>
+</body>
+</html>
